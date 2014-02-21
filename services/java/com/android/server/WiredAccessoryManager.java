@@ -45,6 +45,7 @@ import java.io.FileNotFoundException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import android.os.SystemProperties;
 
 /**
  * <p>WiredAccessoryManager monitors for a wired headset on the main board or dock using
@@ -80,10 +81,17 @@ final class WiredAccessoryManager implements WiredAccessoryCallbacks {
 
     private int mSwitchValues;
 
+    private boolean dockAudioEnabled = false;
+
     private final WiredAccessoryObserver mObserver;
     private final InputManagerService mInputManager;
 
     private final boolean mUseDevInputEventForAudioJack;
+
+    // tmtmtm
+    private final Context mContext;
+    private static final String ALSA_ID = "116";
+    private String activeAlsaOutputDevice = null;
 
     public WiredAccessoryManager(Context context, InputManagerService inputManager) {
         PowerManager pm = (PowerManager)context.getSystemService(Context.POWER_SERVICE);
@@ -97,6 +105,17 @@ final class WiredAccessoryManager implements WiredAccessoryCallbacks {
 
         mObserver = new WiredAccessoryObserver();
 
+        // tmtmtm
+        mContext = context;
+        //if (LOG) Slog.v(TAG, "init() startObserving="+ALSA_ID);
+        //mObserver.startObserving("MAJOR="+ALSA_ID);
+
+        File f = new File("/sys/class/switch/dock/state");
+        if (f!=null && f.exists()) {
+            // Listen out for changes to the Dock Audio Settings
+            context.registerReceiver(new SettingsChangedReceiver(),
+            new IntentFilter("com.cyanogenmod.settings.SamsungDock"), null, null);
+        }
         context.registerReceiver(new BroadcastReceiver() {
                     @Override
                     public void onReceive(Context ctx, Intent intent) {
@@ -106,8 +125,27 @@ final class WiredAccessoryManager implements WiredAccessoryCallbacks {
                 new IntentFilter(Intent.ACTION_BOOT_COMPLETED), null, null);
     }
 
+    private final class SettingsChangedReceiver extends BroadcastReceiver {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            final String action = intent.getAction();
+            Slog.e(TAG, "Recieved a Settings Changed Action " + action);
+            if (action.equals("com.cyanogenmod.settings.SamsungDock")) {
+                String data = intent.getStringExtra("data");
+                Slog.e(TAG, "Recieved a Dock Audio change " + data);
+                if (data != null && data.equals("1")) {
+                    dockAudioEnabled = true;
+                } else {
+                    dockAudioEnabled = false;
+                }
+            }
+        }
+    }
+
     private void bootCompleted() {
+        if (LOG) Slog.v(TAG, "bootCompleted()");
         if (mUseDevInputEventForAudioJack) {
+            if (LOG) Slog.v(TAG, "bootCompleted() mUseDevInputEventForAudioJack");
             int switchValues = 0;
             if (mInputManager.getSwitchState(-1, InputDevice.SOURCE_ANY, SW_HEADPHONE_INSERT) == 1) {
                 switchValues |= SW_HEADPHONE_INSERT_BIT;
@@ -216,6 +254,7 @@ final class WiredAccessoryManager implements WiredAccessoryCallbacks {
         public void handleMessage(Message msg) {
             switch (msg.what) {
                 case MSG_NEW_DEVICE_STATE:
+                    if (LOG) Slog.v(TAG, "MSG_NEW_DEVICE_STATE arg1="+msg.arg1+" arg2="+msg.arg2);
                     setDevicesState(msg.arg1, msg.arg2, (String)msg.obj);
                     mWakeLock.release();
             }
@@ -224,6 +263,7 @@ final class WiredAccessoryManager implements WiredAccessoryCallbacks {
 
     private void setDevicesState(
             int headsetState, int prevHeadsetState, String headsetName) {
+        if (LOG) Slog.v(TAG, "setDevicesState headsetState="+headsetState+" prevHeadsetState="+prevHeadsetState+" headsetName="+headsetName);
         synchronized (mLock) {
             int allHeadsets = SUPPORTED_HEADSETS;
             for (int curHeadset = 1; allHeadsets != 0; curHeadset <<= 1) {
@@ -301,7 +341,8 @@ final class WiredAccessoryManager implements WiredAccessoryCallbacks {
                         FileReader file = new FileReader(uei.getSwitchStatePath());
                         int len = file.read(buffer, 0, 1024);
                         file.close();
-                        curState = Integer.valueOf((new String(buffer, 0, len)).trim());
+                        curState = validateSwitchState(
+                                Integer.valueOf((new String(buffer, 0, len)).trim()));
 
                         if (curState > 0) {
                             updateStateLocked(uei.getDevPath(), uei.getDevName(), curState);
@@ -315,13 +356,29 @@ final class WiredAccessoryManager implements WiredAccessoryCallbacks {
                 }
             }
 
+            if (LOG) Slog.v(TAG, "init() observe all UEVENTs");
             // At any given time accessories could be inserted
-            // one on the board, one on the dock and one on HDMI:
-            // observe three UEVENTs
+            // one on the board, one on the dock, one on the
+            // samsung dock and one on HDMI:
+            // observe all UEVENTs that have valid switch supported
+            // by the Kernel
             for (int i = 0; i < mUEventInfo.size(); ++i) {
                 UEventInfo uei = mUEventInfo.get(i);
+                if (LOG) Slog.v(TAG, "init() startObserving="+uei.getDevPath());
                 startObserving("DEVPATH="+uei.getDevPath());
             }
+
+	        // tmtmtm
+            if (LOG) Slog.v(TAG, "init() startObserving="+ALSA_ID);
+            activeAlsaOutputDevice = null;
+	        mObserver.startObserving("MAJOR="+ALSA_ID);
+        }
+
+        private int validateSwitchState(int state) {
+            // Some drivers, namely HTC headset ones, add additional bits to
+            // the switch state. As we only are able to deal with the states
+            // 0, 1 and 2, mask out all the other bits
+            return state & 0x3;
         }
 
         private List<UEventInfo> makeObservedUEventList() {
@@ -341,9 +398,18 @@ final class WiredAccessoryManager implements WiredAccessoryCallbacks {
             // Monitor USB
             uei = new UEventInfo(NAME_USB_AUDIO, BIT_USB_HEADSET_ANLG, BIT_USB_HEADSET_DGTL);
             if (uei.checkSwitchExists()) {
+                Slog.i(TAG, "This kernel has usb audio support");
                 retVal.add(uei);
             } else {
                 Slog.w(TAG, "This kernel does not have usb audio support");
+            }
+
+            // Monitor Samsung USB audio
+            uei = new UEventInfo("dock", BIT_USB_HEADSET_DGTL, BIT_USB_HEADSET_ANLG);
+            if (uei.checkSwitchExists()) {
+                retVal.add(uei);
+            } else {
+                Slog.w(TAG, "This kernel does not have samsung usb dock audio support");
             }
 
             // Monitor HDMI
@@ -371,12 +437,72 @@ final class WiredAccessoryManager implements WiredAccessoryCallbacks {
 
         @Override
         public void onUEvent(UEventObserver.UEvent event) {
-            if (LOG) Slog.v(TAG, "Headset UEVENT: " + event.toString());
+            //if (LOG) Slog.v(TAG, "Headset UEVENT: " + event.toString());
 
+            // tmtmtm: handle UEvent containing ALSA usb audio device; based on code by jacknorris
+            String major = event.get("MAJOR");
+            String devname = event.get("DEVNAME");
+            if (major!=null && major.equals(ALSA_ID)) {
+                final String USE_HP_WIRED_ACCESSORY_PERSIST_PROP = "persist.sys.use_wired_accessory";
+                final String USE_HP_WIRED_ACCESSORY_DEFAULT = "1";
+                String useHpWiredAccessory = SystemProperties.get(USE_HP_WIRED_ACCESSORY_PERSIST_PROP,
+                                                                  USE_HP_WIRED_ACCESSORY_DEFAULT);
+                if("1".equals(useHpWiredAccessory)) {
+                    String devpath = event.get("DEVPATH").toLowerCase();
+                  //if(LOG) Slog.i(TAG, "#### onUEvent ALSA_ID name="+devname+" devpath="+devpath);
+                    if(LOG) Slog.i(TAG, "#### onUEvent ALSA_ID name="+devname+" action="+event.get("ACTION"));
+                    if (devpath.contains("usb") && !devpath.contains("gadget") && devname.endsWith("p")) {
+                    	boolean actionAdd = event.get("ACTION").equals("add");
+/*
+				        final String HP_WIRED_ACCESSORY_PREF_DEV_PROP = "persist.sys.wired_acc_pref_dev";
+				        final String HP_WIRED_ACCESSORY_PREF_DEV_DEFAULT = "#";
+				        String hpWiredAccessoryPrefDev = SystemProperties.get(HP_WIRED_ACCESSORY_PREF_DEV_PROP,
+				                                                              HP_WIRED_ACCESSORY_PREF_DEV_DEFAULT);
+                    	if(!actionAdd || activeAlsaOutputDevice==null || //hpWiredAccessoryPrefDev.length()<1 || 
+	                   	    	devname.endsWith(hpWiredAccessoryPrefDev+"p")) {
+*/
+		                    try {
+		                        if (LOG) Slog.i(TAG, "#### broadcast AUDIO_BECOMING_NOISY + USB_AUDIO_DEVICE_PLUG");
+		                        mContext.sendBroadcast(new Intent("android.media.AUDIO_BECOMING_NOISY"));
+		                        final Intent usbAudio = new Intent("android.intent.action.USB_AUDIO_DEVICE_PLUG");
+		                        usbAudio.putExtra("state", actionAdd?1:0);
+		                        usbAudio.putExtra("card", Integer.parseInt(""+devname.charAt(8)));
+		                        usbAudio.putExtra("device", Integer.parseInt(""+devname.charAt(10)));
+		                        usbAudio.putExtra("channels", 2);
+//		                        mContext.sendStickyBroadcast(usbAudio);
+		                        mContext.sendBroadcast(usbAudio);
+/*
+		                        if(actionAdd) {
+		                        	activeAlsaOutputDevice = devname;
+		                        } else if(devname.equals(activeAlsaOutputDevice)) {
+		                        	activeAlsaOutputDevice  = null;
+		                        } 
+*/
+		                    } catch (Exception ex) {
+		                        Slog.e(TAG, "Could not broadcast USB_AUDIO_DEVICE_PLUG " + ex);
+		                    }
+/*
+		                }
+*/
+                    }
+                }
+                return;
+            }
+
+            int state = validateSwitchState(Integer.parseInt(event.get("SWITCH_STATE")));
             try {
                 String devPath = event.get("DEVPATH");
                 String name = event.get("SWITCH_NAME");
-                int state = Integer.parseInt(event.get("SWITCH_STATE"));
+                if (name.equals("dock")) {
+                    // Samsung USB Audio Jack is non-sensing - so must be enabled manually
+                    // The choice is made in the GalaxyS2Settings.apk
+                    // device/samsung/i9100/DeviceSettings/src/com/cyanogenmod/settings/device/DockFragmentActivity.java
+                    // This sends an Intent to this class
+                    if ((!dockAudioEnabled) && (state > 0)) {
+                        Slog.e(TAG, "Ignoring dock event as Audio routing disabled " + event);
+                        return;
+                    }
+                }
                 synchronized (mLock) {
                     updateStateLocked(devPath, name, state);
                 }
