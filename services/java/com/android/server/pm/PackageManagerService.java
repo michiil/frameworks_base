@@ -156,6 +156,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -3916,30 +3917,30 @@ public class PackageManagerService extends IPackageManager.Stub {
             mDeferredDexOpt = null;
         }
         if (pkgs != null) {
-            final int[] i = {0};
+            final AtomicInteger i = new AtomicInteger(0);
             final int pkgsSize = pkgs.size();
             ExecutorService executorService = Executors.newFixedThreadPool(sNThreads);
-            final long start = System.currentTimeMillis();
             for (PackageParser.Package pkg : pkgs) {
                 final PackageParser.Package p = pkg;
                 synchronized (mInstallLock) {
-                    if (!p.mDidDexOpt) {
-                        executorService.submit(new Runnable() {
-                            @Override
-                            public void run() {
-                                if (!isFirstBoot()) {
-                                    i[0]++;
-                                    postBootMessageUpdate(i[0], pkgsSize);
+                    executorService.submit(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (!isFirstBoot()) {
+                                i.getAndIncrement();
+                                try {
+                                    ActivityManagerNative.getDefault().showBootMessage(
+                                        mContext.getResources().getString(
+                                            com.android.internal.R.string.android_upgrading_apk,
+                                            i.get(), pkgsSize), true);
+                                } catch (RemoteException e) {
                                 }
+                            }
+                            if (!p.mDidDexOpt) {
                                 performDexOptLI(p, false, false, true);
                             }
-                        });
-                    } else {
-                        if (!isFirstBoot()) {
-                            i[0]++;
-                            postBootMessageUpdate(i[0], pkgsSize);
                         }
-                    }
+                    });
                 }
             }
             executorService.shutdown();
@@ -3948,18 +3949,6 @@ public class PackageManagerService extends IPackageManager.Stub {
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
-            final long time = System.currentTimeMillis() - start;
-            Slog.v("MIK", "Finished in "+time+" ms");
-        }
-    }
-
-    private void postBootMessageUpdate(int n, int total) {
-        try {
-            ActivityManagerNative.getDefault().showBootMessage(
-                    mContext.getResources().getString(
-                            com.android.internal.R.string.android_upgrading_apk,
-                            n, total), true);
-        } catch (RemoteException e) {
         }
     }
 
@@ -9725,6 +9714,7 @@ public class PackageManagerService extends IPackageManager.Stub {
                         false, //installed
                         true,  //stopped
                         true,  //notLaunched
+                        false, //heads up
                         false, //blocked
                         null, null, null);
                 if (!isSystemApp(ps)) {
@@ -10353,6 +10343,55 @@ public class PackageManagerService extends IPackageManager.Stub {
                 ? null
                 : new ComponentName(preferred.activityInfo.packageName,
                         preferred.activityInfo.name);
+    }
+
+    @Override
+    public void setHeadsUpSetting(String appPackageName,
+            boolean enabled, int userId) {
+        if (!sUserManager.exists(userId)) return;
+        setHeadsUp(appPackageName, enabled, userId);
+    }
+
+    @Override
+    public boolean getHeadsUpSetting(String packageName, int userId) {
+        if (!sUserManager.exists(userId)) return false;
+        int uid = Binder.getCallingUid();
+        enforceCrossUserPermission(uid, userId, false, "get heads up setting");
+        // reader
+        synchronized (mPackages) {
+            return mSettings.getHeadsUpSettingLPr(packageName, userId);
+        }
+    }
+
+    private void setHeadsUp(final String packageName,
+            final boolean enabled, final int userId) {
+        PackageSetting pkgSetting;
+        final int uid = Binder.getCallingUid();
+        final int permission = mContext.checkCallingPermission(
+                android.Manifest.permission.CHANGE_HEADS_UP_STATE);
+        final boolean allowedByPermission = (permission == PackageManager.PERMISSION_GRANTED);
+        enforceCrossUserPermission(uid, userId, false, "set heads up setting");
+
+        synchronized (mPackages) {
+            pkgSetting = mSettings.mPackages.get(packageName);
+            if (pkgSetting == null) {
+                throw new IllegalArgumentException(
+                        "Unknown package: " + packageName);
+            }
+            // Allow root and verify that userId is not being specified by a different user
+            if (!allowedByPermission && !UserHandle.isSameApp(uid, pkgSetting.appId)) {
+                throw new SecurityException(
+                        "Permission Denial: attempt to change heads up state from pid="
+                        + Binder.getCallingPid()
+                        + ", uid=" + uid + ", package uid=" + pkgSetting.appId);
+            }
+            if (pkgSetting.isHeadsUp(userId) == enabled) {
+                // Nothing to do
+                return;
+            }
+            pkgSetting.setHeadsUp(enabled, userId);
+            mSettings.writePackageRestrictionsLPr(userId);
+        }
     }
 
     @Override
