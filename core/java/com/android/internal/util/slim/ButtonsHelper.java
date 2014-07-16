@@ -414,6 +414,12 @@ public class ButtonsHelper {
         } else if (clickAction.equals(ButtonsConstants.ACTION_THEME_SWITCH)) {
             resId = systemUiResources.getIdentifier(
                         SYSTEMUI_METADATA_NAME + ":drawable/ic_sysbar_theme_switch", null, null);
+        } else if (clickAction.equals(ButtonsConstants.ACTION_VOLUME_UP)) {
+            resId = systemUiResources.getIdentifier(
+                        SYSTEMUI_METADATA_NAME + ":drawable/ic_vm_plus_dis", null, null);
+        } else if (clickAction.equals(ButtonsConstants.ACTION_VOLUME_DOWN)) {
+            resId = systemUiResources.getIdentifier(
+                        SYSTEMUI_METADATA_NAME + ":drawable/ic_vm_minus_dis", null, null);
         } else {
             resId = systemUiResources.getIdentifier(
                         SYSTEMUI_METADATA_NAME + ":drawable/ic_sysbar_null", null, null);

@@ -99,10 +99,10 @@ public class SlimActions {
             if (action.equals(ButtonsConstants.ACTION_HOME)) {
                 triggerVirtualKeypress(KeyEvent.KEYCODE_HOME, isLongpress);
                 return;
-            } else if (action.equals(ButtonsConstants.ACTION_VOL_UP)) {
+            } else if (action.equals(ButtonsConstants.ACTION_VOLUME_UP)) {
                 triggerVirtualKeypress(KeyEvent.KEYCODE_VOLUME_UP, isLongpress);
                 return;
-            } else if (action.equals(ButtonsConstants.ACTION_VOL_DOWN)) {
+            } else if (action.equals(ButtonsConstants.ACTION_VOLUME_DOWN)) {
                 triggerVirtualKeypress(KeyEvent.KEYCODE_VOLUME_DOWN, isLongpress);
                 return;
             } else if (action.equals(ButtonsConstants.ACTION_BACK)) {
