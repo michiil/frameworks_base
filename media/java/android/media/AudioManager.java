@@ -520,30 +520,21 @@ public class AudioManager {
                  * Adjust the volume in on key down since it is more
                  * responsive to the user.
                  */
-                Configuration config = mContext.getResources().getConfiguration();
-                int direction;
-                int rotation = mWindowManager.getDefaultDisplay().getRotation();
-                if ((rotation == Surface.ROTATION_90
-                        || rotation == Surface.ROTATION_180)
-                        && config.getLayoutDirection() == View.LAYOUT_DIRECTION_LTR) {
-                    direction = keyCode == KeyEvent.KEYCODE_VOLUME_UP
-                            ? ADJUST_LOWER
-                            : ADJUST_RAISE;
-                } else {
-                    direction = keyCode == KeyEvent.KEYCODE_VOLUME_UP
-                            ? ADJUST_RAISE
-                            : ADJUST_LOWER;
-                }
-
                 int flags = FLAG_SHOW_UI | FLAG_VIBRATE;
 
-                if(isStreamMute(3))
-		    setStreamMute(3, !isStreamMute(3));
-
                 if (mUseMasterVolume) {
-                    adjustMasterVolume(direction, flags);
+                    adjustMasterVolume(
+                            keyCode == KeyEvent.KEYCODE_VOLUME_UP
+                                    ? ADJUST_RAISE
+                                    : ADJUST_LOWER,
+                            flags);
                 } else {
-                    adjustSuggestedStreamVolume(direction, stream, flags);
+                    adjustSuggestedStreamVolume(
+                            keyCode == KeyEvent.KEYCODE_VOLUME_UP
+                                    ? ADJUST_RAISE
+                                    : ADJUST_LOWER,
+                            stream,
+                            flags);
                 }
                 break;
             case KeyEvent.KEYCODE_VOLUME_MUTE:
