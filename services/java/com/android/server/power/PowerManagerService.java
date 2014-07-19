@@ -715,6 +715,18 @@ public final class PowerManagerService extends IPowerManager.Stub
                         + ", tag=\"" + tag + "\", ws=" + ws + ", uid=" + uid + ", pid=" + pid);
             }
 
+            boolean blockWakelock = false;
+
+            if (!mSeenWakeLocks.contains(tag)){
+                mSeenWakeLocks.add(tag);
+            }
+
+            if (mWakeLockBlockingEnabled == 1){
+                if (mBlockedWakeLocks.contains(tag)){
+                    blockWakelock = true;
+                }
+            }
+
             WakeLock wakeLock;
             int index = findWakeLockIndexLocked(lock);
             if (index >= 0) {
