@@ -100,13 +100,13 @@ public class SlimActions {
                 triggerVirtualKeypress(KeyEvent.KEYCODE_HOME, isLongpress);
                 return;
             } else if (action.equals(ButtonsConstants.ACTION_MEDIA_PLAY)) {
-                triggerVirtualKeypress(KeyEvent.KEYCODE_KEYCODE_MEDIA_PLAY_PAUSE, isLongpress);
+                triggerVirtualKeypress(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, isLongpress);
                 return;
             } else if (action.equals(ButtonsConstants.ACTION_MEDIA_NEXT)) {
                 triggerVirtualKeypress(KeyEvent.KEYCODE_MEDIA_NEXT, isLongpress);
                 return;
             } else if (action.equals(ButtonsConstants.ACTION_MEDIA_PREV)) {
-                triggerVirtualKeypress(KeyEvent.KEYCODE_KEYCODE_MEDIA_PREVIOUS, isLongpress);
+                triggerVirtualKeypress(KeyEvent.KEYCODE_MEDIA_PREVIOUS, isLongpress);
                 return;
             } else if (action.equals(ButtonsConstants.ACTION_VOLUME_UP)) {
                 triggerVirtualKeypress(KeyEvent.KEYCODE_VOLUME_UP, isLongpress);
