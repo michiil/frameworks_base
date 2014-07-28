@@ -55,6 +55,11 @@ public class ButtonsConstants {
     public static final String ACTION_MEDIA_PLAY           = "**media_play**";
     public static final String ACTION_MEDIA_NEXT           = "**media_next**";
     public static final String ACTION_MEDIA_PREV           = "**media_prev**";
+    public static final String ACTION_CAMERA               = "**camera**";
+    public static final String ACTION_MEDIA_PREVIOUS       = "**media_previous**";
+    public static final String ACTION_MEDIA_NEXT           = "**media_next**";
+    public static final String ACTION_MEDIA_PLAY_PAUSE     = "**media_play_pause**";
+    public static final String ACTION_WAKE_DEVICE          = "**wake_device**";
 
     // no action
     public static final String ACTION_NULL            = "**null**";
