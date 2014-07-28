@@ -110,9 +110,6 @@ public class SlimActions {
             } else if (action.equals(ButtonsConstants.ACTION_MEDIA_PREV)) {
                 triggerVirtualKeypress(KeyEvent.KEYCODE_KEYCODE_MEDIA_PREVIOUS, isLongpress);
                 return;
-            } else if (action.equals(ButtonsConstants.ACTION_VOLUME_UP)) {
-                triggerVirtualKeypress(KeyEvent.KEYCODE_VOLUME_UP, isLongpress);
-                return;
             } else if (action.equals(ButtonsConstants.ACTION_VOLUME_DOWN)) {
                 triggerVirtualKeypress(KeyEvent.KEYCODE_VOLUME_DOWN, isLongpress);
                 return;
