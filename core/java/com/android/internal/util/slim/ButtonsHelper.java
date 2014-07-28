@@ -420,15 +420,6 @@ public class ButtonsHelper {
         } else if (clickAction.equals(ButtonsConstants.ACTION_VOLUME_DOWN)) {
             resId = systemUiResources.getIdentifier(
                         SYSTEMUI_METADATA_NAME + ":drawable/ic_sysbar_minus", null, null);
-        } else if (clickAction.equals(ButtonsConstants.ACTION_MEDIA_PLAY)) {
-            resId = systemUiResources.getIdentifier(
-                        SYSTEMUI_METADATA_NAME + ":drawable/ic_sysbar_play", null, null);
-        } else if (clickAction.equals(ButtonsConstants.ACTION_MEDIA_NEXT)) {
-            resId = systemUiResources.getIdentifier(
-                        SYSTEMUI_METADATA_NAME + ":drawable/ic_sysbar_next", null, null);
-        } else if (clickAction.equals(ButtonsConstants.ACTION_MEDIA_PREV)) {
-            resId = systemUiResources.getIdentifier(
-                        SYSTEMUI_METADATA_NAME + ":drawable/ic_sysbar_previous", null, null);
         } else {
             resId = systemUiResources.getIdentifier(
                         SYSTEMUI_METADATA_NAME + ":drawable/ic_sysbar_null", null, null);
